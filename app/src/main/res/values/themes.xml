@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Tema principal para tu app -->
+    <style name="Theme.CitasCRIT" parent="Theme.MaterialComponents.DayNight">
+        <!-- Puedes personalizar colores y fuentes aquí -->
+        <!-- <item name="colorPrimary">@color/your_primary_color</item> -->
+        <!-- <item name="colorSecondary">@color/your_secondary_color</item> -->
+    </style>
+
+    <!-- Tema para el Splash Screen -->
+    <style name="Theme.CitasCRIT.Splash" parent="Theme.MaterialComponents.DayNight">
+        <item name="windowSplashScreenBackground">@android:color/white</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_screen</item>
+        <item name="postSplashScreenTheme">@style/Theme.CitasCRIT</item>
+    </style>
+
+</resources>
