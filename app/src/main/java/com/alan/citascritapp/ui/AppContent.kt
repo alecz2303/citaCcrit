@@ -1,8 +1,10 @@
 package com.alan.citascritapp.ui
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
@@ -33,6 +35,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import android.widget.Toast
+import com.alan.citascritapp.utils.programarAlarmaCita
+import com.alan.citascritapp.utils.cancelarTodasAlarmasCitas
+import com.alan.citascritapp.utils.cancelarAlarmaCita // ¡Asegúrate de importar esto!
+import android.provider.Settings
 
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
@@ -58,14 +64,25 @@ fun AppContent(
     var showDialog by remember { mutableStateOf(false) }
     var pendingUri by remember { mutableStateOf<Uri?>(null) }
 
+    // Estado para mostrar el diálogo de permiso
+    var mostrarDialogoPermisoAlarma by remember { mutableStateOf(false) }
+
     suspend fun recargarDatos() {
         citas = cargarCitas(context)
         carnet = cargarCarnet(context)
+        Log.d("ALARMA_DEBUG", "Recargando datos, citas: ${citas.size}")
         citas.forEach { cita ->
+            Log.d("ALARMA_DEBUG", "Evaluando cita ${cita.servicio} ${cita.fecha} ${cita.hora}")
             if (!citaYaPaso(cita.fecha, cita.hora) && !cita.cancelada) {
-                programarNotificacionCita(context, cita)
+                Log.d("ALARMA_DEBUG", "Voy a programar la alarma de esta cita")
+                programarAlarmaCita(
+                    context,
+                    cita,
+                    onPermisoFaltante = { mostrarDialogoPermisoAlarma = true }
+                )
             }
         }
+        programarAlertasCitasDiaSiguiente(context, citas)
     }
 
     LaunchedEffect(Unit) {
@@ -118,7 +135,9 @@ fun AppContent(
                 pendingUri = uri
                 showDialog = true
             } else {
-                cancelarTodasNotificacionesCitas(context)
+                scope.launch {
+                    cancelarTodasAlarmasCitas(context)
+                }
                 procesarPDF(context, uri, perfil, onPerfilUpdate, scope) { nuevasCitas, nuevoCarnetStr ->
                     citas = nuevasCitas
                     carnet = nuevoCarnetStr
@@ -129,9 +148,14 @@ fun AppContent(
                     )
                     nuevasCitas.forEach { cita ->
                         if (!citaYaPaso(cita.fecha, cita.hora) && !cita.cancelada) {
-                            programarNotificacionCita(context, cita)
+                            programarAlarmaCita(
+                                context,
+                                cita,
+                                onPermisoFaltante = { mostrarDialogoPermisoAlarma = true }
+                            )
                         }
                     }
+                    programarAlertasCitasDiaSiguiente(context, nuevasCitas)
                 }
             }
         }
@@ -147,7 +171,9 @@ fun AppContent(
                 TextButton(onClick = {
                     showDialog = false
                     pendingUri?.let { uri ->
-                        cancelarTodasNotificacionesCitas(context)
+                        scope.launch {
+                            cancelarTodasAlarmasCitas(context)
+                        }
                         procesarPDF(context, uri, perfil, onPerfilUpdate, scope) { nuevasCitas, nuevoCarnetStr ->
                             citas = nuevasCitas
                             carnet = nuevoCarnetStr
@@ -158,9 +184,10 @@ fun AppContent(
                             )
                             nuevasCitas.forEach { cita ->
                                 if (!citaYaPaso(cita.fecha, cita.hora) && !cita.cancelada) {
-                                    programarNotificacionCita(context, cita)
+                                    programarAlarmaCita(context, cita)
                                 }
                             }
+                            programarAlertasCitasDiaSiguiente(context, nuevasCitas)
                         }
                         pendingUri = null
                     }
@@ -186,10 +213,10 @@ fun AppContent(
             text = { Text("¿Estás seguro de cancelar la cita de ${citaPendientePorCancelar?.servicio} a las ${citaPendientePorCancelar?.hora}? Esta acción no se puede deshacer.") },
             confirmButton = {
                 TextButton(onClick = {
-                    Toast.makeText(context, "Click SÍ cancelar", Toast.LENGTH_SHORT).show()
                     val citaParaCancelar = citaPendientePorCancelar
                     if (citaParaCancelar != null) {
                         scope.launch {
+                            cancelarAlarmaCita(context, citaParaCancelar)
                             citas = citas.map {
                                 if (it == citaParaCancelar) it.copy(cancelada = true) else it
                             }
@@ -213,6 +240,37 @@ fun AppContent(
                     citaPendientePorCancelar = null
                 }) {
                     Text("No")
+                }
+            }
+        )
+    }
+
+    if (mostrarDialogoPermisoAlarma) {
+        AlertDialog(
+            onDismissRequest = { mostrarDialogoPermisoAlarma = false },
+            title = { Text("Permiso necesario para alarmas exactas") },
+            text = {
+                Text(
+                    "Para que la app pueda avisarte exactamente a la hora de tus citas, necesitas otorgar el permiso de 'Alarmas exactas'.\n\n" +
+                            "Si no das este permiso, tus notificaciones podrían llegar tarde, no sonar, o incluso no aparecer.\n\n" +
+                            "Por ejemplo: si tienes una cita importante y no diste este permiso, tu teléfono podría no avisarte a tiempo y corres el riesgo de olvidar tu cita.\n\n" +
+                            "¿Quieres ir a la configuración para dar este permiso ahora?"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    mostrarDialogoPermisoAlarma = false
+                    val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                        this.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    context.startActivity(intent)
+                }) {
+                    Text("Ir a configuración")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { mostrarDialogoPermisoAlarma = false }) {
+                    Text("No, gracias")
                 }
             }
         )
