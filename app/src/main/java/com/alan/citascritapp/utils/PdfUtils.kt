@@ -139,6 +139,10 @@ fun procesarPDF(
             onPerfilUpdate(actualizado)
         }
         // **Agregado: programa notificaciones**
-        programarNotificacionesCitas(context, nuevasCitas)
+        for (cita in nuevasCitas) {
+            if (!cita.cancelada && !citaYaPaso(cita.fecha, cita.hora)) {
+                programarAlarmaCita(context, cita)
+            }
+        }
     }
 }

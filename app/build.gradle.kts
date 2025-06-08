@@ -36,6 +36,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -66,11 +67,11 @@ dependencies {
     implementation ("androidx.core:core-splashscreen:1.0.1")
     implementation ("androidx.compose.material3:material3:1.2.0")
     implementation ("com.google.android.material:material:1.1.0")
-    implementation("com.google.accompanist:accompanist-swiperefresh:0.33.2-alpha")
+    implementation ("com.google.accompanist:accompanist-swiperefresh:0.33.2-alpha")
     implementation ("io.github.vanpra.compose-material-dialogs:core:0.9.0")
     implementation ("io.github.vanpra.compose-material-dialogs:datetime:0.9.0")
     implementation ("com.jakewharton.threetenabp:threetenabp:1.4.4")
     implementation ("androidx.compose.material:material:1.6.1")
-
+    implementation ("androidx.compose.foundation:foundation:1.6.0")
 
 }

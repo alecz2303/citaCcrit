@@ -11,12 +11,14 @@ import androidx.core.app.ActivityCompat
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.alan.citascritapp.ui.MainApp
+import com.alan.citascritapp.utils.crearCanalNotificaciones
 import com.jakewharton.threetenabp.AndroidThreeTen
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        crearCanalNotificaciones(applicationContext)
         AndroidThreeTen.init(this)
         PDFBoxResourceLoader.init(applicationContext)
         setContent {

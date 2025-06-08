@@ -1,8 +1,10 @@
 package com.alan.citascritapp.ui
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
@@ -29,9 +31,15 @@ import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.vector.ImageVector
-
-// ¡IMPORTANTE! Asegúrate que tu data class tenga cancelada: Boolean
-// data class Cita(..., val cancelada: Boolean = false)
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import android.widget.Toast
+import com.alan.citascritapp.utils.programarAlarmaCita
+import com.alan.citascritapp.utils.cancelarTodasAlarmasCitas
+import com.alan.citascritapp.utils.cancelarAlarmaCita // ¡Asegúrate de importar esto!
+import android.provider.Settings
+import androidx.compose.foundation.clickable
 
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,18 +57,40 @@ fun AppContent(
     var isRefreshing by remember { mutableStateOf(false) }
     var mostrarFinalizadas by remember { mutableStateOf(false) }
 
-    // AlertDialog state
+    // Estados para diálogo de cancelar cita
+    var mostrarConfirmacionCancelar by remember { mutableStateOf(false) }
+    var citaPendientePorCancelar by remember { mutableStateOf<Cita?>(null) }
+
+    // AlertDialog state para PDF
     var showDialog by remember { mutableStateOf(false) }
     var pendingUri by remember { mutableStateOf<Uri?>(null) }
+
+    // Estado para mostrar el diálogo de permiso
+    var mostrarDialogoPermisoAlarma by remember { mutableStateOf(false) }
+
+    // --- INTEGRACIÓN TTS ---
+    val ttsHelper = remember { TTSHelper(context) }
+    DisposableEffect(Unit) {
+        onDispose { ttsHelper.shutdown() }
+    }
+    // ----------------------
 
     suspend fun recargarDatos() {
         citas = cargarCitas(context)
         carnet = cargarCarnet(context)
+        Log.d("ALARMA_DEBUG", "Recargando datos, citas: ${citas.size}")
         citas.forEach { cita ->
+            Log.d("ALARMA_DEBUG", "Evaluando cita ${cita.servicio} ${cita.fecha} ${cita.hora}")
             if (!citaYaPaso(cita.fecha, cita.hora) && !cita.cancelada) {
-                programarNotificacionCita(context, cita)
+                Log.d("ALARMA_DEBUG", "Voy a programar la alarma de esta cita")
+                programarAlarmaCita(
+                    context,
+                    cita,
+                    onPermisoFaltante = { mostrarDialogoPermisoAlarma = true }
+                )
             }
         }
+        programarAlertasCitasDiaSiguiente(context, citas)
     }
 
     LaunchedEffect(Unit) {
@@ -113,7 +143,9 @@ fun AppContent(
                 pendingUri = uri
                 showDialog = true
             } else {
-                cancelarTodasNotificacionesCitas(context)
+                scope.launch {
+                    cancelarTodasAlarmasCitas(context)
+                }
                 procesarPDF(context, uri, perfil, onPerfilUpdate, scope) { nuevasCitas, nuevoCarnetStr ->
                     citas = nuevasCitas
                     carnet = nuevoCarnetStr
@@ -124,9 +156,14 @@ fun AppContent(
                     )
                     nuevasCitas.forEach { cita ->
                         if (!citaYaPaso(cita.fecha, cita.hora) && !cita.cancelada) {
-                            programarNotificacionCita(context, cita)
+                            programarAlarmaCita(
+                                context,
+                                cita,
+                                onPermisoFaltante = { mostrarDialogoPermisoAlarma = true }
+                            )
                         }
                     }
+                    programarAlertasCitasDiaSiguiente(context, nuevasCitas)
                 }
             }
         }
@@ -142,7 +179,9 @@ fun AppContent(
                 TextButton(onClick = {
                     showDialog = false
                     pendingUri?.let { uri ->
-                        cancelarTodasNotificacionesCitas(context)
+                        scope.launch {
+                            cancelarTodasAlarmasCitas(context)
+                        }
                         procesarPDF(context, uri, perfil, onPerfilUpdate, scope) { nuevasCitas, nuevoCarnetStr ->
                             citas = nuevasCitas
                             carnet = nuevoCarnetStr
@@ -153,9 +192,10 @@ fun AppContent(
                             )
                             nuevasCitas.forEach { cita ->
                                 if (!citaYaPaso(cita.fecha, cita.hora) && !cita.cancelada) {
-                                    programarNotificacionCita(context, cita)
+                                    programarAlarmaCita(context, cita)
                                 }
                             }
+                            programarAlertasCitasDiaSiguiente(context, nuevasCitas)
                         }
                         pendingUri = null
                     }
@@ -166,6 +206,80 @@ fun AppContent(
                     showDialog = false
                     pendingUri = null
                 }) { Text("Cancelar") }
+            }
+        )
+    }
+
+    // ALERT DIALOG PARA CONFIRMAR CANCELACIÓN DE CITA
+    if (mostrarConfirmacionCancelar && citaPendientePorCancelar != null) {
+        AlertDialog(
+            onDismissRequest = {
+                mostrarConfirmacionCancelar = false
+                citaPendientePorCancelar = null
+            },
+            title = { Text("¿Cancelar cita?") },
+            text = { Text("¿Estás seguro de cancelar la cita de ${citaPendientePorCancelar?.servicio} a las ${citaPendientePorCancelar?.hora}? Esta acción no se puede deshacer.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    val citaParaCancelar = citaPendientePorCancelar
+                    if (citaParaCancelar != null) {
+                        scope.launch {
+                            cancelarAlarmaCita(context, citaParaCancelar)
+                            citas = citas.map {
+                                if (it == citaParaCancelar) it.copy(cancelada = true) else it
+                            }
+                            guardarCitas(context, citas)
+                            Toast.makeText(
+                                context,
+                                "Cita cancelada: ${citaParaCancelar.servicio} ${citaParaCancelar.hora}",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                    mostrarConfirmacionCancelar = false
+                    citaPendientePorCancelar = null
+                }) {
+                    Text("Sí, cancelar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    mostrarConfirmacionCancelar = false
+                    citaPendientePorCancelar = null
+                }) {
+                    Text("No")
+                }
+            }
+        )
+    }
+
+    if (mostrarDialogoPermisoAlarma) {
+        AlertDialog(
+            onDismissRequest = { mostrarDialogoPermisoAlarma = false },
+            title = { Text("Permiso necesario para alarmas exactas") },
+            text = {
+                Text(
+                    "Para que la app pueda avisarte exactamente a la hora de tus citas, necesitas otorgar el permiso de 'Alarmas exactas'.\n\n" +
+                            "Si no das este permiso, tus notificaciones podrían llegar tarde, no sonar, o incluso no aparecer.\n\n" +
+                            "Por ejemplo: si tienes una cita importante y no diste este permiso, tu teléfono podría no avisarte a tiempo y corres el riesgo de olvidar tu cita.\n\n" +
+                            "¿Quieres ir a la configuración para dar este permiso ahora?"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    mostrarDialogoPermisoAlarma = false
+                    val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                        this.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    context.startActivity(intent)
+                }) {
+                    Text("Ir a configuración")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { mostrarDialogoPermisoAlarma = false }) {
+                    Text("No, gracias")
+                }
             }
         )
     }
@@ -229,7 +343,7 @@ fun AppContent(
                     .padding(top = 4.dp, bottom = 12.dp)
             )
 
-            // Switch para mostrar/ocultar finalizadas
+            // Switch para mostrar/ocultar finalizadas/canceladas
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -290,47 +404,65 @@ fun AppContent(
                             items(citasDeEseDia, key = { it.hashCode() }) { cita ->
                                 val (color, icon) = getCardColorAndIcon(cita.servicio)
                                 val dismissState = rememberSwipeToDismissBoxState(
+                                    positionalThreshold = { 60f },
                                     confirmValueChange = { value ->
                                         if (
-                                            value == SwipeToDismissBoxValue.EndToStart ||
-                                            value == SwipeToDismissBoxValue.StartToEnd
+                                            (value == SwipeToDismissBoxValue.EndToStart || value == SwipeToDismissBoxValue.StartToEnd) &&
+                                            !citaYaPaso(cita.fecha, cita.hora) && !cita.cancelada
                                         ) {
-                                            // Solo permite cancelar si NO está finalizada/cancelada
-                                            if (!citaYaPaso(cita.fecha, cita.hora) && !cita.cancelada) {
-                                                scope.launch {
-                                                    // Marca como cancelada
-                                                    citas = citas.map {
-                                                        if (it == cita) it.copy(cancelada = true) else it
-                                                    }
-                                                    guardarCitas(context, citas)
-                                                }
-                                            }
-                                            true
+                                            // Abre el diálogo, NO cancela aún
+                                            mostrarConfirmacionCancelar = true
+                                            citaPendientePorCancelar = cita
+                                            // Cancelar swipe automático (volver a estado default)
+                                            false
                                         } else false
                                     }
                                 )
                                 SwipeToDismissBox(
                                     state = dismissState,
+                                    enableDismissFromEndToStart = true,
+                                    enableDismissFromStartToEnd = true,
                                     backgroundContent = {
                                         Box(
                                             Modifier
                                                 .fillMaxSize()
+                                                .clip(RoundedCornerShape(22.dp))
                                                 .background(Color(0xFFF44336)),
                                             contentAlignment = Alignment.CenterEnd
                                         ) {
-                                            Icon(
-                                                Icons.Default.Delete,
-                                                contentDescription = "Cancelar cita",
-                                                tint = Color.White,
-                                                modifier = Modifier.padding(end = 24.dp)
-                                            )
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxHeight()
+                                                    .fillMaxWidth()
+                                                    .padding(end = 24.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.End
+                                            ) {
+                                                Text(
+                                                    "CANCELAR",
+                                                    color = Color.White,
+                                                    fontWeight = FontWeight.Bold,
+                                                    textAlign = TextAlign.End,
+                                                    modifier = Modifier.padding(end = 10.dp)
+                                                )
+                                                Icon(
+                                                    Icons.Default.Delete,
+                                                    contentDescription = "Cancelar cita",
+                                                    tint = Color.White,
+                                                    modifier = Modifier.size(28.dp)
+                                                )
+                                            }
                                         }
-                                    },
-                                    enableDismissFromEndToStart = true,
-                                    enableDismissFromStartToEnd = true,
+                                    }
                                 ) {
                                     Card(
-                                        modifier = Modifier.fillMaxWidth(),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            // INTEGRACIÓN DE LECTURA TTS
+                                            .clickable {
+                                                val texto = "Cita de ${cita.servicio}, el ${cita.fecha}, a las ${cita.hora}, con ${cita.medico}"
+                                                ttsHelper.speak(texto)
+                                            },
                                         colors = CardDefaults.cardColors(containerColor = color),
                                         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                                     ) {
