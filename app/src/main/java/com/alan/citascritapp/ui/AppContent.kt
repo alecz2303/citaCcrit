@@ -29,9 +29,10 @@ import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.vector.ImageVector
-
-// ¡IMPORTANTE! Asegúrate que tu data class tenga cancelada: Boolean
-// data class Cita(..., val cancelada: Boolean = false)
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import android.widget.Toast
 
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,7 +50,11 @@ fun AppContent(
     var isRefreshing by remember { mutableStateOf(false) }
     var mostrarFinalizadas by remember { mutableStateOf(false) }
 
-    // AlertDialog state
+    // Estados para diálogo de cancelar cita
+    var mostrarConfirmacionCancelar by remember { mutableStateOf(false) }
+    var citaPendientePorCancelar by remember { mutableStateOf<Cita?>(null) }
+
+    // AlertDialog state para PDF
     var showDialog by remember { mutableStateOf(false) }
     var pendingUri by remember { mutableStateOf<Uri?>(null) }
 
@@ -170,6 +175,49 @@ fun AppContent(
         )
     }
 
+    // ALERT DIALOG PARA CONFIRMAR CANCELACIÓN DE CITA
+    if (mostrarConfirmacionCancelar && citaPendientePorCancelar != null) {
+        AlertDialog(
+            onDismissRequest = {
+                mostrarConfirmacionCancelar = false
+                citaPendientePorCancelar = null
+            },
+            title = { Text("¿Cancelar cita?") },
+            text = { Text("¿Estás seguro de cancelar la cita de ${citaPendientePorCancelar?.servicio} a las ${citaPendientePorCancelar?.hora}? Esta acción no se puede deshacer.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    Toast.makeText(context, "Click SÍ cancelar", Toast.LENGTH_SHORT).show()
+                    val citaParaCancelar = citaPendientePorCancelar
+                    if (citaParaCancelar != null) {
+                        scope.launch {
+                            citas = citas.map {
+                                if (it == citaParaCancelar) it.copy(cancelada = true) else it
+                            }
+                            guardarCitas(context, citas)
+                            Toast.makeText(
+                                context,
+                                "Cita cancelada: ${citaParaCancelar.servicio} ${citaParaCancelar.hora}",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                    mostrarConfirmacionCancelar = false
+                    citaPendientePorCancelar = null
+                }) {
+                    Text("Sí, cancelar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    mostrarConfirmacionCancelar = false
+                    citaPendientePorCancelar = null
+                }) {
+                    Text("No")
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -229,7 +277,7 @@ fun AppContent(
                     .padding(top = 4.dp, bottom = 12.dp)
             )
 
-            // Switch para mostrar/ocultar finalizadas
+            // Switch para mostrar/ocultar finalizadas/canceladas
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -290,44 +338,56 @@ fun AppContent(
                             items(citasDeEseDia, key = { it.hashCode() }) { cita ->
                                 val (color, icon) = getCardColorAndIcon(cita.servicio)
                                 val dismissState = rememberSwipeToDismissBoxState(
+                                    positionalThreshold = { 60f },
                                     confirmValueChange = { value ->
                                         if (
-                                            value == SwipeToDismissBoxValue.EndToStart ||
-                                            value == SwipeToDismissBoxValue.StartToEnd
+                                            (value == SwipeToDismissBoxValue.EndToStart || value == SwipeToDismissBoxValue.StartToEnd) &&
+                                            !citaYaPaso(cita.fecha, cita.hora) && !cita.cancelada
                                         ) {
-                                            // Solo permite cancelar si NO está finalizada/cancelada
-                                            if (!citaYaPaso(cita.fecha, cita.hora) && !cita.cancelada) {
-                                                scope.launch {
-                                                    // Marca como cancelada
-                                                    citas = citas.map {
-                                                        if (it == cita) it.copy(cancelada = true) else it
-                                                    }
-                                                    guardarCitas(context, citas)
-                                                }
-                                            }
-                                            true
+                                            // Abre el diálogo, NO cancela aún
+                                            mostrarConfirmacionCancelar = true
+                                            citaPendientePorCancelar = cita
+                                            // Cancelar swipe automático (volver a estado default)
+                                            false
                                         } else false
                                     }
                                 )
                                 SwipeToDismissBox(
                                     state = dismissState,
+                                    enableDismissFromEndToStart = true,
+                                    enableDismissFromStartToEnd = true,
                                     backgroundContent = {
                                         Box(
                                             Modifier
                                                 .fillMaxSize()
+                                                .clip(RoundedCornerShape(22.dp))
                                                 .background(Color(0xFFF44336)),
                                             contentAlignment = Alignment.CenterEnd
                                         ) {
-                                            Icon(
-                                                Icons.Default.Delete,
-                                                contentDescription = "Cancelar cita",
-                                                tint = Color.White,
-                                                modifier = Modifier.padding(end = 24.dp)
-                                            )
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxHeight()
+                                                    .fillMaxWidth()
+                                                    .padding(end = 24.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.End
+                                            ) {
+                                                Text(
+                                                    "CANCELAR",
+                                                    color = Color.White,
+                                                    fontWeight = FontWeight.Bold,
+                                                    textAlign = TextAlign.End,
+                                                    modifier = Modifier.padding(end = 10.dp)
+                                                )
+                                                Icon(
+                                                    Icons.Default.Delete,
+                                                    contentDescription = "Cancelar cita",
+                                                    tint = Color.White,
+                                                    modifier = Modifier.size(28.dp)
+                                                )
+                                            }
                                         }
-                                    },
-                                    enableDismissFromEndToStart = true,
-                                    enableDismissFromStartToEnd = true,
+                                    }
                                 ) {
                                     Card(
                                         modifier = Modifier.fillMaxWidth(),
