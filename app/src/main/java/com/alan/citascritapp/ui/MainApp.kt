@@ -21,6 +21,11 @@ import com.alan.citascritapp.utils.guardarPerfil
 import com.alan.citascritapp.models.PacienteProfile
 import com.alan.citascritapp.models.perfilVacio
 import kotlinx.coroutines.launch
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.filled.BugReport
+import com.alan.citascritapp.ui.PantallaAlarmasDebug
+import com.alan.citascritapp.BuildConfig // <-- AGREGA ESTE IMPORT
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
@@ -33,6 +38,9 @@ fun MainApp(context: Context) {
     var bannerMessage by remember { mutableStateOf<String?>(null) }
     var bannerColor by remember { mutableStateOf(Color(0xFFD32F2F)) }
     var bannerIcon by remember { mutableStateOf<ImageVector?>(null) }
+
+    // Estado para mostrar la pantalla de alarmas debug
+    var mostrarAlarmasDebug by remember { mutableStateOf(false) }
 
     // Cargar perfil en inicio
     LaunchedEffect(Unit) {
@@ -71,6 +79,11 @@ fun MainApp(context: Context) {
                         showPerfil = false
                     }
                 )
+            } else if (mostrarAlarmasDebug) {
+                PantallaAlarmasDebug(
+                    context = context,
+                    onBack = { mostrarAlarmasDebug = false }
+                )
             } else {
                 AppContent(
                     context = context,
@@ -90,6 +103,20 @@ fun MainApp(context: Context) {
                         bannerIcon = icon
                     }
                 )
+                // FAB SOLO EN DEBUG
+                if (BuildConfig.DEBUG) {
+                    Box(
+                        Modifier.fillMaxSize(),
+                        contentAlignment = androidx.compose.ui.Alignment.BottomEnd
+                    ) {
+                        FloatingActionButton(
+                            onClick = { mostrarAlarmasDebug = true },
+                            containerColor = MaterialTheme.colorScheme.secondary
+                        ) {
+                            Icon(Icons.Default.BugReport, contentDescription = "Ver alarmas (debug)")
+                        }
+                    }
+                }
             }
         }
     }
