@@ -71,6 +71,7 @@ dependencies {
     implementation ("io.github.vanpra.compose-material-dialogs:datetime:0.9.0")
     implementation ("com.jakewharton.threetenabp:threetenabp:1.4.4")
     implementation ("androidx.compose.material:material:1.6.1")
+    implementation ("androidx.compose.foundation:foundation:1.6.0")
 
 
 }
