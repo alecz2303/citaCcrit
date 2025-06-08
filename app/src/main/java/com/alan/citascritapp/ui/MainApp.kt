@@ -25,7 +25,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.filled.BugReport
 import com.alan.citascritapp.ui.PantallaAlarmasDebug
-import com.alan.citascritapp.BuildConfig // <-- AGREGA ESTE IMPORT
+import com.alan.citascritapp.BuildConfig // <-- Este import sí va
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
@@ -34,17 +34,21 @@ fun MainApp(context: Context) {
     var perfil by remember { mutableStateOf<com.alan.citascritapp.models.PacienteProfile?>(null) }
     val scope = rememberCoroutineScope()
 
-    // Banner notification state
     var bannerMessage by remember { mutableStateOf<String?>(null) }
     var bannerColor by remember { mutableStateOf(Color(0xFFD32F2F)) }
     var bannerIcon by remember { mutableStateOf<ImageVector?>(null) }
 
-    // Estado para mostrar la pantalla de alarmas debug
+    var faltaCarnet by remember { mutableStateOf(false) }
     var mostrarAlarmasDebug by remember { mutableStateOf(false) }
 
     // Cargar perfil en inicio
     LaunchedEffect(Unit) {
-        perfil = cargarPerfil(context)
+        val p = cargarPerfil(context)
+        perfil = p
+        if (p?.carnet.isNullOrBlank()) {
+            showPerfil = true
+            faltaCarnet = true
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -62,22 +66,29 @@ fun MainApp(context: Context) {
                 PerfilScreen(
                     context = context,
                     perfil = perfil,
-                    onPerfilChange = {
-                        perfil = it
-                    },
+                    onPerfilChange = { perfil = it },
                     onGuardar = {
-                        scope.launch {
-                            guardarPerfil(context, perfil ?: com.alan.citascritapp.models.perfilVacio)
-                            // Banner de éxito
-                            bannerMessage = "Perfil actualizado correctamente"
-                            bannerIcon = Icons.Default.CheckCircle
-                            bannerColor = Color(0xFF388E3C)
+                        if (perfil?.carnet.isNullOrBlank()) {
+                            // Si carnet sigue vacío, no dejar salir y mostrar error
+                            bannerMessage = "El campo Carnet es obligatorio para continuar."
+                            bannerIcon = Icons.Default.Warning
+                            bannerColor = Color(0xFFD32F2F)
+                        } else {
+                            scope.launch {
+                                guardarPerfil(context, perfil ?: com.alan.citascritapp.models.perfilVacio)
+                                bannerMessage = "Perfil actualizado correctamente"
+                                bannerIcon = Icons.Default.CheckCircle
+                                bannerColor = Color(0xFF388E3C)
+                            }
+                            showPerfil = false
+                            faltaCarnet = false
                         }
-                        showPerfil = false
                     },
                     onCancelar = {
-                        showPerfil = false
-                    }
+                        // Solo dejar cancelar si no falta Carnet (es decir, ya había uno guardado antes)
+                        if (!faltaCarnet) showPerfil = false
+                    },
+                    ocultarCancelar = faltaCarnet // <- pásale esto a tu PerfilScreen para ocultar Cancelar si falta Carnet
                 )
             } else if (mostrarAlarmasDebug) {
                 PantallaAlarmasDebug(
@@ -92,7 +103,6 @@ fun MainApp(context: Context) {
                     onPerfilUpdate = {
                         perfil = it
                         scope.launch { guardarPerfil(context, it) }
-                        // Banner de éxito
                         bannerMessage = "Perfil actualizado correctamente"
                         bannerIcon = Icons.Default.CheckCircle
                         bannerColor = Color(0xFF388E3C)

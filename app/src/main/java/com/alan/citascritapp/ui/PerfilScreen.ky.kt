@@ -63,7 +63,8 @@ fun PerfilScreen(
     perfil: PacienteProfile?,
     onPerfilChange: (PacienteProfile) -> Unit,
     onGuardar: () -> Unit,
-    onCancelar: () -> Unit
+    onCancelar: () -> Unit,
+    ocultarCancelar: Boolean = false
 ) {
     var nombre by remember { mutableStateOf(perfil?.nombre ?: "") }
     var apellidoP by remember { mutableStateOf(perfil?.apellidoP ?: "") }
@@ -73,6 +74,8 @@ fun PerfilScreen(
     var carnet by remember { mutableStateOf(perfil?.carnet ?: "") }
     var showSavedMessage by remember { mutableStateOf(false) }
     var imageRefreshKey by remember { mutableStateOf(0) }
+    var showCarnetError by remember { mutableStateOf(false) }
+    var showFechaError by remember { mutableStateOf(false) }
 
     // Date dialog state
     val dateDialogState = rememberMaterialDialogState()
@@ -195,28 +198,23 @@ fun PerfilScreen(
 
         OutlinedTextField(
             value = fechaNacimiento,
-            onValueChange = {},
-            label = { Text("Fecha de nacimiento") },
-            trailingIcon = { Icon(Icons.Default.CalendarToday, contentDescription = null) },
-            enabled = false,
-            readOnly = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { dateDialogState.show() }
+            onValueChange = {
+                fechaNacimiento = it
+                showFechaError = !fechaNacimiento.matches(Regex("""\d{4}-\d{2}-\d{2}"""))
+            },
+            label = { Text("Fecha de nacimiento (AAAA-MM-DD)") },
+            placeholder = { Text("Ej. 2016-10-28") },
+            singleLine = true,
+            isError = showFechaError && fechaNacimiento.isNotBlank(),
+            modifier = Modifier.fillMaxWidth()
         )
-        MaterialDialog(
-            dialogState = dateDialogState,
-            buttons = {
-                positiveButton("Aceptar")
-                negativeButton("Cancelar")
-            }
-        ) {
-            datepicker(
-                initialDate = fechaNacimiento.toLocalDateOrToday(),
-                title = "Selecciona la fecha de nacimiento"
-            ) { date ->
-                fechaNacimiento = date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
-            }
+        if (showFechaError && fechaNacimiento.isNotBlank()) {
+            Text(
+                text = "El formato debe ser AAAA-MM-DD (ejemplo: 2016-10-28)",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 6.dp)
+            )
         }
         Spacer(Modifier.height(8.dp))
         Text(
@@ -230,12 +228,24 @@ fun PerfilScreen(
 
         OutlinedTextField(
             value = carnet,
-            onValueChange = { carnet = it },
+            onValueChange = {
+                carnet = it
+                showCarnetError = false // oculta el error al escribir
+            },
             label = { Text("Carnet") },
-            placeholder = { Text("Opcional") },
+            placeholder = { Text("Obligatorio") },
             singleLine = true,
+            isError = showCarnetError && carnet.isBlank(),
             modifier = Modifier.fillMaxWidth()
         )
+        if (showCarnetError && carnet.isBlank()) {
+            Text(
+                text = "El campo Carnet es obligatorio para continuar.",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 6.dp)
+            )
+        }
         Spacer(Modifier.height(24.dp))
 
         Row(
@@ -244,10 +254,18 @@ fun PerfilScreen(
         ) {
             Button(
                 onClick = {
-                    val nuevoPerfil = PacienteProfile(nombre, apellidoP, apellidoM, fechaNacimiento, fotoPath, carnet)
-                    onPerfilChange(nuevoPerfil)
-                    onGuardar()
-                    showSavedMessage = true
+                    if (carnet.isBlank()) {
+                        showCarnetError = true
+                    } else if (fechaNacimiento.isBlank() || !fechaNacimiento.matches(Regex("""\d{4}-\d{2}-\d{2}"""))) {
+                        showFechaError = true
+                    } else {
+                        showCarnetError = false
+                        showFechaError = false
+                        val nuevoPerfil = PacienteProfile(nombre, apellidoP, apellidoM, fechaNacimiento, fotoPath, carnet)
+                        onPerfilChange(nuevoPerfil)
+                        onGuardar()
+                        showSavedMessage = true
+                    }
                 },
                 modifier = Modifier.weight(1f),
                 enabled = nombre.isNotBlank() && apellidoP.isNotBlank() && apellidoM.isNotBlank() && fechaNacimiento.isNotBlank()

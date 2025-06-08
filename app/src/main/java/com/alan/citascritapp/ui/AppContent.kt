@@ -39,6 +39,7 @@ import com.alan.citascritapp.utils.programarAlarmaCita
 import com.alan.citascritapp.utils.cancelarTodasAlarmasCitas
 import com.alan.citascritapp.utils.cancelarAlarmaCita // ¡Asegúrate de importar esto!
 import android.provider.Settings
+import androidx.compose.foundation.clickable
 
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
@@ -66,6 +67,13 @@ fun AppContent(
 
     // Estado para mostrar el diálogo de permiso
     var mostrarDialogoPermisoAlarma by remember { mutableStateOf(false) }
+
+    // --- INTEGRACIÓN TTS ---
+    val ttsHelper = remember { TTSHelper(context) }
+    DisposableEffect(Unit) {
+        onDispose { ttsHelper.shutdown() }
+    }
+    // ----------------------
 
     suspend fun recargarDatos() {
         citas = cargarCitas(context)
@@ -448,7 +456,13 @@ fun AppContent(
                                     }
                                 ) {
                                     Card(
-                                        modifier = Modifier.fillMaxWidth(),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            // INTEGRACIÓN DE LECTURA TTS
+                                            .clickable {
+                                                val texto = "Cita de ${cita.servicio}, el ${cita.fecha}, a las ${cita.hora}, con ${cita.medico}"
+                                                ttsHelper.speak(texto)
+                                            },
                                         colors = CardDefaults.cardColors(containerColor = color),
                                         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                                     ) {
