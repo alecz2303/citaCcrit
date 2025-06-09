@@ -53,7 +53,7 @@ import com.vanpra.composematerialdialogs.MaterialDialog
 import com.vanpra.composematerialdialogs.datetime.date.datepicker
 import java.time.format.DateTimeFormatter
 import androidx.compose.material3.Snackbar
-
+import androidx.compose.ui.text.input.TextFieldValue
 
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
@@ -69,7 +69,7 @@ fun PerfilScreen(
     var nombre by remember { mutableStateOf(perfil?.nombre ?: "") }
     var apellidoP by remember { mutableStateOf(perfil?.apellidoP ?: "") }
     var apellidoM by remember { mutableStateOf(perfil?.apellidoM ?: "") }
-    var fechaNacimiento by remember { mutableStateOf(perfil?.fechaNacimiento ?: "") }
+    //var fechaNacimiento by remember { mutableStateOf(perfil?.fechaNacimiento ?: "") }
     var fotoPath by remember { mutableStateOf(perfil?.fotoPath ?: "") }
     var carnet by remember { mutableStateOf(perfil?.carnet ?: "") }
     var showSavedMessage by remember { mutableStateOf(false) }
@@ -89,6 +89,10 @@ fun PerfilScreen(
             }
         }
     }
+
+    // Estado para el campo de fecha con manejo de cursor
+    var fechaNacimientoState by remember { mutableStateOf(TextFieldValue(perfil?.fechaNacimiento ?: "")) }
+    val fechaNacimiento = fechaNacimientoState.text
 
     val edad = fechaNacimiento.toEdad()
 
@@ -197,16 +201,26 @@ fun PerfilScreen(
         Spacer(Modifier.height(12.dp))
 
         OutlinedTextField(
-            value = fechaNacimiento,
-            onValueChange = {
-                fechaNacimiento = it
-                showFechaError = !fechaNacimiento.matches(Regex("""\d{4}-\d{2}-\d{2}"""))
+            value = fechaNacimientoState,
+            onValueChange = { value ->
+                // Solo números y máximo 8 dígitos (AAAA MM DD)
+                val limpio = value.text.filter { it.isDigit() }.take(8)
+                val sb = StringBuilder()
+                for (i in limpio.indices) {
+                    sb.append(limpio[i])
+                    if ((i == 3 || i == 5) && i != limpio.lastIndex) sb.append("-")
+                }
+                // Mantén el cursor al final
+                val finalText = sb.toString()
+                fechaNacimientoState = TextFieldValue(finalText, selection = androidx.compose.ui.text.TextRange(finalText.length))
             },
             label = { Text("Fecha de nacimiento (AAAA-MM-DD)") },
-            placeholder = { Text("Ej. 2016-10-28") },
+            placeholder = { Text("Ej. 2017-02-13") },
+            //trailingIcon = { Icon(Icons.Default.CalendarToday, contentDescription = null) },
             singleLine = true,
-            isError = showFechaError && fechaNacimiento.isNotBlank(),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { dateDialogState.show() }
         )
         if (showFechaError && fechaNacimiento.isNotBlank()) {
             Text(
@@ -275,7 +289,7 @@ fun PerfilScreen(
                     nombre = perfil?.nombre ?: ""
                     apellidoP = perfil?.apellidoP ?: ""
                     apellidoM = perfil?.apellidoM ?: ""
-                    fechaNacimiento = perfil?.fechaNacimiento ?: ""
+                    fechaNacimientoState = (perfil?.fechaNacimiento ?: "") as TextFieldValue
                     fotoPath = perfil?.fotoPath ?: ""
                     carnet = perfil?.carnet ?: ""
                     imageRefreshKey++
