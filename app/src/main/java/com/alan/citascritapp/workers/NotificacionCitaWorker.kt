@@ -24,7 +24,7 @@ class NotificacionCitaWorker(appContext: Context, workerParams: WorkerParameters
     }
 
     private fun mostrarNotificacion(context: Context, titulo: String, mensaje: String, notificationId: Int) {
-        val channelId = "citas_crit_channel_v2"
+        val channelId = "citas_crit_channel_v4"
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val soundUri = Uri.parse("android.resource://${context.packageName}/${R.raw.police_woop_woop}")
 

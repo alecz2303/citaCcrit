@@ -18,7 +18,7 @@ class NotificacionReceiver : BroadcastReceiver() {
         val mensaje = intent.getStringExtra("mensaje") ?: "Tienes una cita próximamente."
         val notificationId = intent.getIntExtra("notificationId", (System.currentTimeMillis() % Int.MAX_VALUE).toInt())
 
-        val channelId = "citas_crit_channel_v2"
+        val channelId = "citas_crit_channel_v4"
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val soundUri = Uri.parse("android.resource://${context.packageName}/${R.raw.police_woop_woop}")
 

@@ -184,8 +184,8 @@ fun programarAlertasCitasDiaSiguiente(context: Context, citas: List<Cita>) {
             val date = formato.parse(fecha) ?: continue
             val cal = Calendar.getInstance().apply { time = date }
             cal.add(Calendar.DATE, -1) // un día antes
-            cal.set(Calendar.HOUR_OF_DAY, 20) // 8pm
-            cal.set(Calendar.MINUTE, 0)
+            cal.set(Calendar.HOUR_OF_DAY, 10) // 8pm
+            cal.set(Calendar.MINUTE, 1)
             cal.set(Calendar.SECOND, 0)
             cal.set(Calendar.MILLISECOND, 0)
 
@@ -236,7 +236,7 @@ fun cancelarAlertasCitasDiaSiguiente(context: Context, citas: List<Cita>) {
 
 fun crearCanalNotificaciones(context: Context) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        val channelId = "citas_channel_v3"
+        val channelId = "citas_crit_channel_v4"
         val name = "Citas CRIT"
         val descriptionText = "Recordatorios de citas"
         val importance = NotificationManager.IMPORTANCE_HIGH

@@ -23,7 +23,7 @@ class AlarmaReceiver : BroadcastReceiver() {
             val mensaje = "¡Mañana tienes una o más citas en el CRIT ($fecha)!"
             val soundUri = Uri.parse("android.resource://${context.packageName}/${R.raw.police_woop_woop}")
 
-            val builder = NotificationCompat.Builder(context, "citas_channel_v3")
+            val builder = NotificationCompat.Builder(context, "citas_crit_channel_v4")
                 .setSmallIcon(R.drawable.ic_dino_notif)
                 .setContentTitle("Citas CRIT mañana")
                 .setContentText(mensaje)
@@ -55,7 +55,7 @@ class AlarmaReceiver : BroadcastReceiver() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val builder = NotificationCompat.Builder(context, "citas_channel_v3")
+        val builder = NotificationCompat.Builder(context, "citas_crit_channel_v4")
             .setSmallIcon(R.drawable.ic_dino_notif)
             .setContentTitle("Recordatorio de cita")
             .setContentText(mensaje)
