@@ -40,6 +40,16 @@ import com.alan.citascritapp.utils.cancelarTodasAlarmasCitas
 import com.alan.citascritapp.utils.cancelarAlarmaCita // ¡Asegúrate de importar esto!
 import android.provider.Settings
 import androidx.compose.foundation.clickable
+import coil.compose.AsyncImage
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.IconButton
+import com.alan.citascritapp.R
+import androidx.compose.ui.res.painterResource
+import android.media.MediaPlayer
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
+import coil.decode.GifDecoder
+import coil.request.ImageRequest
 
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
@@ -74,6 +84,9 @@ fun AppContent(
         onDispose { ttsHelper.shutdown() }
     }
     // ----------------------
+
+    // Nuevo estado para mostrar el gif
+    var showDinoDialog by remember { mutableStateOf(false) }
 
     suspend fun recargarDatos() {
         citas = cargarCitas(context)
@@ -287,7 +300,24 @@ fun AppContent(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Citas CRIT") },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Citas CRIT")
+                        Spacer(Modifier.width(6.dp))
+                        IconButton(
+                            onClick = { showDinoDialog = true },
+                            modifier = Modifier.size(30.dp)
+                        ) {
+                            // Puedes usar un icono, emoji, o un mini dino estático
+                            Icon(
+                                painterResource(id = R.drawable.ic_dino_notif), // O tu imagen de dino pequeña
+                                contentDescription = "Dino",
+                                modifier = Modifier.size(22.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                },
                 actions = {
                     TextButton(onClick = onEditPerfil) {
                         Icon(
@@ -567,5 +597,52 @@ fun AppContent(
                 }
             }
         }
+    }
+
+    // Mostramos el Dialog con el GIF
+    if (showDinoDialog) {
+        val context = LocalContext.current
+
+        LaunchedEffect(key1 = showDinoDialog) {
+            if (showDinoDialog) {
+                val mediaPlayer = MediaPlayer.create(context, R.raw.marimba_ritmo) // Usa el nombre de tu archivo
+                mediaPlayer.start()
+                mediaPlayer.setOnCompletionListener { it.release() }
+            }
+        }
+
+        AlertDialog(
+            onDismissRequest = { showDinoDialog = false },
+            confirmButton = {
+                TextButton(onClick = { showDinoDialog = false }) { Text("Cerrar") }
+            },
+            text = {
+                // Este Box ayuda a centrar y dar espacio visual
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .wrapContentHeight(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                    ) {
+                        Text("¡Bailecito del Nino Nino! 🦕")
+                        Spacer(Modifier.height(10.dp))
+                        AsyncImage(
+                            model = ImageRequest.Builder(context)
+                                .data("file:///android_asset/dino_dance.gif")
+                                .decoderFactory(GifDecoder.Factory())
+                                .build(),
+                            contentDescription = "Dino bailando",
+                            modifier = Modifier.size(250.dp)
+                        )
+                        Text("¡Con Cariño Alan Rodrigo! 💛💜")
+                    }
+                }
+            }
+        )
     }
 }

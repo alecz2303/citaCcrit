@@ -226,9 +226,9 @@ fun PerfilScreen(
                     val finalText = sb.toString()
                     fechaNacimientoState = TextFieldValue(finalText, selection = androidx.compose.ui.text.TextRange(finalText.length))
                 },
-                label = { Text("Fecha de nacimiento") },
-                placeholder = { Text("AAAA-MM-DD") },
-                trailingIcon = { Icon(Icons.Default.CalendarToday, contentDescription = null) },
+                label = { Text("Fecha de nacimiento (AAAA-MM-DD)") },
+                placeholder = { Text("Ej. 2017-02-13") },
+                //trailingIcon = { Icon(Icons.Default.CalendarToday, contentDescription = null) },
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -236,7 +236,7 @@ fun PerfilScreen(
             )
             if (showFechaError && fechaNacimiento.isNotBlank()) {
                 Text(
-                    text = "El formato debe ser AAAA-MM-DD (ejemplo: 2016-10-28)",
+                    text = "El formato debe ser AAAA-MM-DD (ejemplo: 2017-03-13)",
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 6.dp)
