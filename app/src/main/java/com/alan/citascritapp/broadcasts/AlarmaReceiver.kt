@@ -12,6 +12,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.alan.citascritapp.MainActivity
 import com.alan.citascritapp.R
+import com.alan.citascritapp.utils.DuracionesTerapias
 
 class AlarmaReceiver : BroadcastReceiver() {
     @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
@@ -42,7 +43,8 @@ class AlarmaReceiver : BroadcastReceiver() {
         val servicio = intent.getStringExtra("servicio") ?: "Cita CRIT"
         val hora = intent.getStringExtra("hora") ?: ""
         val fecha = intent.getStringExtra("fecha") ?: ""
-        val mensaje = "¡Tienes una cita de $servicio a las $hora!"
+        val duracion = DuracionesTerapias.obtenerDuracion(servicio)
+        val mensaje = "¡Tienes una cita de $servicio a las $hora! (Duración: ${duracion} min)"
         val soundUri = Uri.parse("android.resource://${context.packageName}/${R.raw.police_woop_woop}")
 
         val notificationIntent = Intent(context, MainActivity::class.java).apply {
