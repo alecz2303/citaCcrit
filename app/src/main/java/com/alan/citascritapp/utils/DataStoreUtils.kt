@@ -7,14 +7,20 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import androidx.datastore.preferences.core.emptyPreferences
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import java.io.InputStream
 import java.text.SimpleDateFormat
 import java.time.LocalDate
@@ -73,35 +79,35 @@ fun getCardColorAndIcon(servicio: String): Pair<Color, ImageVector> {
     val s = servicio.lowercase()
     return when {
         // --- TERAPIAS PRINCIPALES ---
-        "psicología" in s -> Pair(Color(0xFFE3F2FD), Icons.Default.Psychology)
-        "física" in s -> Pair(Color(0xFFFFF9C4), Icons.Default.FitnessCenter)
-        "ocupacional" in s -> Pair(Color(0xFFE8F5E9), Icons.Default.Handyman)
-        "lenguaje" in s || "comunicación" in s -> Pair(Color(0xFFFFECB3), Icons.Default.RecordVoiceOver)
-        "tanque" in s || "hidro" in s || "acuática" in s -> Pair(Color(0xFFE1F5FE), Icons.Default.Pool)
+        "psicología" in s -> Pair(Color(0xFFE1BEE7), Icons.Default.Psychology) // Violeta suave
+        "física" in s -> Pair(Color(0xFFBBDEFB), Icons.Default.FitnessCenter) // Azul claro vibrante
+        "ocupacional" in s -> Pair(Color(0xFFC8E6C9), Icons.Default.Handyman) // Verde suave
+        "lenguaje" in s || "comunicación" in s -> Pair(Color(0xFFFFCC80), Icons.Default.RecordVoiceOver) // Naranja suave
+        "tanque" in s || "hidro" in s || "acuática" in s -> Pair(Color(0xFFB3E5FC), Icons.Default.Pool) // Cyan claro
 
         // --- ÁREAS MÉDICAS ---
-        "pediatría" in s || "pediatria" in s -> Pair(Color(0xFFFFF3E0), Icons.Default.ChildCare)
-        "neuropediatría" in s || "neuropediatria" in s -> Pair(Color(0xFFE1BEE7), Icons.Default.Psychology)
-        "genética" in s -> Pair(Color(0xFFF3E5F5), Icons.Default.Science)
-        "nutrición" in s || "nutricion" in s -> Pair(Color(0xFFE8F5E9), Icons.Default.Restaurant)
-        "odontología" in s || "odontologia" in s -> Pair(Color(0xFFFFEBEE), Icons.Default.MedicalServices)
-        "oftalmología" in s || "oftalmologia" in s -> Pair(Color(0xFFE0F7FA), Icons.Default.RemoveRedEye)
+        "pediatría" in s || "pediatria" in s -> Pair(Color(0xFFFFE0B2), Icons.Default.ChildCare)
+        "neuropediatría" in s || "neuropediatria" in s -> Pair(Color(0xFFD1C4E9), Icons.Default.Psychology)
+        "genética" in s -> Pair(Color(0xFFE1BEE7), Icons.Default.Science)
+        "nutrición" in s || "nutricion" in s -> Pair(Color(0xFFC8E6C9), Icons.Default.Restaurant)
+        "odontología" in s || "odontologia" in s -> Pair(Color(0xFFFFCDD2), Icons.Default.MedicalServices)
+        "oftalmología" in s || "oftalmologia" in s -> Pair(Color(0xFFB2EBF2), Icons.Default.RemoveRedEye)
         "otorrino" in s || "otorrinolaringología" in s || "otorrinolaringologia" in s ->
-            Pair(Color(0xFFF3E5F5), Icons.Default.Hearing)
-        "ortopedia" in s -> Pair(Color(0xFFEDE7F6), Icons.Default.HealthAndSafety)
+            Pair(Color(0xFFE1BEE7), Icons.Default.Hearing)
+        "ortopedia" in s -> Pair(Color(0xFFD7CCC8), Icons.Default.HealthAndSafety)
         "medicina física" in s || "rehabilitación" in s || "rehabilitacion" in s ->
-            Pair(Color(0xFFE0F2F1), Icons.Default.LocalHospital)
+            Pair(Color(0xFFB2DFDB), Icons.Default.LocalHospital)
         "valoración clínica" in s || "valoracion clínica" in s || "valoracion clinica" in s ->
             Pair(Color(0xFFB2DFDB), Icons.Default.MedicalServices)
 
         // --- OTRAS ÁREAS DEL CRIT ---
         "trabajo social" in s || "social" in s -> Pair(Color(0xFFFFE0B2), Icons.Default.People)
-        "asistencia tecnológica" in s || "asistencia tecnologica" in s -> Pair(Color(0xFFEEEEEE), Icons.Default.Memory)
+        "asistencia tecnológica" in s || "asistencia tecnologica" in s -> Pair(Color(0xFFF5F5F5), Icons.Default.Memory)
         "robótico" in s || "robotico" in s -> Pair(Color(0xFFB3E5FC), Icons.Default.SmartToy)
         "integración educativa" in s || "integracion educativa" in s ->
-            Pair(Color(0xFFE8EAF6), Icons.Default.School)
-        "taller de padres" in s -> Pair(Color(0xFFFFF8E1), Icons.Default.Groups)
-        "vida independiente" in s -> Pair(Color(0xFFF1F8E9), Icons.Default.SelfImprovement)
+            Pair(Color(0xFFC5CAE9), Icons.Default.School)
+        "taller de padres" in s -> Pair(Color(0xFFFFF9C4), Icons.Default.Groups)
+        "vida independiente" in s -> Pair(Color(0xFFDCEDC8), Icons.Default.SelfImprovement)
 
         // --- DEFAULT / NO CLASIFICADO ---
         else -> Pair(Color(0xFFFFFFFF), Icons.Default.EventNote)
@@ -240,4 +246,25 @@ suspend fun cargarPerfil(context: Context): PacienteProfile? {
     val perfilJson = prefs[PERFIL_KEY] ?: return null
     val gson = Gson()
     return gson.fromJson(perfilJson, PacienteProfile::class.java)
+}
+val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
+
+suspend fun guardarOnboarding(context: Context, completado: Boolean) {
+    context.dataStore.edit { preferences ->
+        preferences[ONBOARDING_COMPLETED] = completado
+    }
+}
+
+fun cargarOnboarding(context: Context): Flow<Boolean> {
+    return context.dataStore.data
+        .catch { exception ->
+            if (exception is IOException) {
+                emit(emptyPreferences())
+            } else {
+                throw exception
+            }
+        }
+        .map { preferences ->
+            preferences[ONBOARDING_COMPLETED] ?: false
+        }
 }

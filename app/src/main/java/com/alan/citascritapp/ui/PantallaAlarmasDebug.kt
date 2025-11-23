@@ -79,6 +79,23 @@ fun PantallaAlarmasDebug(
                 Spacer(Modifier.height(10.dp))
                 Button(
                     onClick = {
+                        val intent = android.content.Intent(context, com.alan.citascritapp.broadcasts.AlarmaReceiver::class.java).apply {
+                            putExtra("tipo", "alerta_citas_dia_siguiente")
+                            putExtra("fecha", "Mañana (Prueba)")
+                        }
+                        context.sendBroadcast(intent)
+                        android.widget.Toast.makeText(context, "Alerta de prueba enviada", android.widget.Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                ) {
+                    Text("Probar Alerta Día Anterior")
+                }
+
+                Spacer(Modifier.height(10.dp))
+                Button(
+                    onClick = {
                         limpiarAlarmasDebug(context)
                         alarmas = emptyList() // Limpiar lista local
                     },

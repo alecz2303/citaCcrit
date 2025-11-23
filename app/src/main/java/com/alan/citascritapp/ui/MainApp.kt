@@ -13,82 +13,66 @@ import androidx.compose.material3.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.alan.citascritapp.ui.AppContent
+import com.alan.citascritapp.ui.OnboardingScreen
 import com.alan.citascritapp.ui.PerfilScreen
 import com.alan.citascritapp.ui.TimedBanner
-import com.alan.citascritapp.utils.cargarPerfil
 import com.alan.citascritapp.utils.guardarPerfil
-import com.alan.citascritapp.models.PacienteProfile
 import com.alan.citascritapp.models.perfilVacio
 import kotlinx.coroutines.launch
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.filled.BugReport
 import com.alan.citascritapp.ui.PantallaAlarmasDebug
-import com.alan.citascritapp.BuildConfig // <-- Este import sí va
+import com.alan.citascritapp.BuildConfig
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun MainApp(context: Context) {
+    val viewModel: MainViewModel = viewModel()
+    val uiState by viewModel.uiState.collectAsState()
+    
     var showPerfil by remember { mutableStateOf(false) }
-    var perfil by remember { mutableStateOf<com.alan.citascritapp.models.PacienteProfile?>(null) }
     val scope = rememberCoroutineScope()
-
-    var bannerMessage by remember { mutableStateOf<String?>(null) }
-    var bannerColor by remember { mutableStateOf(Color(0xFFD32F2F)) }
-    var bannerIcon by remember { mutableStateOf<ImageVector?>(null) }
-
-    var faltaCarnet by remember { mutableStateOf(false) }
     var mostrarAlarmasDebug by remember { mutableStateOf(false) }
 
-    // Cargar perfil en inicio
-    LaunchedEffect(Unit) {
-        val p = cargarPerfil(context)
-        perfil = p
-        if (p?.carnet.isNullOrBlank()) {
+    // Mostrar perfil si falta carnet
+    LaunchedEffect(uiState.perfil) {
+        if (uiState.perfil != null && uiState.perfil!!.carnet.isBlank()) {
             showPerfil = true
-            faltaCarnet = true
         }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Banner superior
         TimedBanner(
-            message = bannerMessage,
-            icon = bannerIcon ?: Icons.Default.Warning,
-            backgroundColor = bannerColor,
-            onClose = { bannerMessage = null },
+            message = uiState.bannerMessage,
+            icon = uiState.bannerIcon ?: Icons.Default.Warning,
+            backgroundColor = uiState.bannerColor,
+            onClose = { viewModel.ocultarBanner() },
             durationMillis = 2000
         )
 
         Surface(color = MaterialTheme.colorScheme.background) {
-            if (showPerfil) {
+            if (!uiState.onboardingCompleted && !uiState.isLoading) {
+                OnboardingScreen(
+                    onFinish = { viewModel.completarOnboarding() }
+                )
+            } else if (showPerfil) {
                 PerfilScreen(
                     context = context,
-                    perfil = perfil,
-                    onPerfilChange = { perfil = it },
+                    perfil = uiState.perfil,
+                    onPerfilChange = { nuevoPerfil -> 
+                        viewModel.actualizarPerfil(nuevoPerfil)
+                    },
                     onGuardar = {
-                        if (perfil?.carnet.isNullOrBlank()) {
-                            // Si carnet sigue vacío, no dejar salir y mostrar error
-                            bannerMessage = "El campo Carnet es obligatorio para continuar."
-                            bannerIcon = Icons.Default.Warning
-                            bannerColor = Color(0xFFD32F2F)
-                        } else {
-                            scope.launch {
-                                guardarPerfil(context, perfil ?: com.alan.citascritapp.models.perfilVacio)
-                                bannerMessage = "Perfil actualizado correctamente"
-                                bannerIcon = Icons.Default.CheckCircle
-                                bannerColor = Color(0xFF388E3C)
-                            }
-                            showPerfil = false
-                            faltaCarnet = false
-                        }
+                        showPerfil = false
                     },
                     onCancelar = {
-                        // Solo dejar cancelar si no falta Carnet (es decir, ya había uno guardado antes)
-                        if (!faltaCarnet) showPerfil = false
+                        if (!uiState.perfil?.carnet.isNullOrBlank()) showPerfil = false
                     },
-                    ocultarCancelar = faltaCarnet // <- pásale esto a tu PerfilScreen para ocultar Cancelar si falta Carnet
+                    ocultarCancelar = uiState.perfil?.carnet.isNullOrBlank()
                 )
             } else if (mostrarAlarmasDebug) {
                 PantallaAlarmasDebug(
@@ -97,22 +81,10 @@ fun MainApp(context: Context) {
                 )
             } else {
                 AppContent(
-                    context = context,
-                    perfil = perfil,
-                    onEditPerfil = { showPerfil = true },
-                    onPerfilUpdate = {
-                        perfil = it
-                        scope.launch { guardarPerfil(context, it) }
-                        bannerMessage = "Perfil actualizado correctamente"
-                        bannerIcon = Icons.Default.CheckCircle
-                        bannerColor = Color(0xFF388E3C)
-                    },
-                    showBanner = { msg, color, icon ->
-                        bannerMessage = msg
-                        bannerColor = color
-                        bannerIcon = icon
-                    }
+                    viewModel = viewModel,
+                    onEditPerfil = { showPerfil = true }
                 )
+                
                 // FAB SOLO EN DEBUG
                 if (BuildConfig.DEBUG) {
                     Box(
